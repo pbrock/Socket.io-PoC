@@ -1,0 +1,195 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<link rel="stylesheet" href="http://twitter.github.com/bootstrap/1.4.0/bootstrap.min.css">
+<link rel="stylesheet" media="all" href="css/gradients.css" />
+<link rel="stylesheet" media="all" href="css/clientMonitor.css" />
+<script src="http://127.0.0.1:8080/socket.io/socket.io.js"></script>
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.6.2/jquery.min.js" type="text/javascript">	</script>
+
+<title>Admin</title>
+<script>
+	$(document).ready(function(){
+		var msgCount = 0;
+		var highlighted = false;
+		var socket = io.connect('http://localhost:8080');
+		
+  		socket.on('connect', function (client) {
+    		//clientConnect();
+  		});
+		
+		socket.on('getName', function (clientID) {
+      		socket.emit('setAdminName');
+    	});
+		
+		socket.on('customerLogin', function(custName, clientID){
+			$('#messages h2').after('<div data-rel="' + clientID + '" id="msg-' + msgCount.toString() + '" class="alert-message info"><a href="#" class="close">x</a><p>' + custName + ' logged in</p></div>');
+			$('#noMessagesAlert').fadeOut('normal', function(){$(this).remove()});
+			if(highlighted){
+				var currentShown = $('#custCount li.highlighted').attr('data-rel');
+				if(clientID == currentShown){
+					$('.alert-message').first().fadeIn('slow');
+				}else{
+					$('#custCount li[data-rel=' + clientID + '] .alertIcon:hidden').show();
+				}
+			}else{
+				$('.alert-message').first().fadeIn('slow');
+			}
+			msgCount++;
+		});
+		
+		socket.on('customerComplete', function(custName, clientID){
+			$('#messages h2').after('<div data-rel="' + clientID + '" id="msg-' + msgCount.toString() + '" class="alert-message success"><a href="#" class="close">x</a><p>' + custName + ' is ready to checkout</p></div>')
+			$('#msg-' + msgCount.toString())
+				.bind(
+					'age',
+					function(event, ageCount, msgID){
+						logAge(ageCount, msgID);
+					}
+				);
+			$('#noMessagesAlert').fadeOut('normal', function(){$(this).remove()});
+			if(highlighted){
+				var currentShown = $('#custCount li.highlighted').attr('data-rel');
+				if(clientID == currentShown){
+					$('.alert-message').first().fadeIn('slow', function(){timeThis('#' + $('.alert-message').first().attr('id'), 1);});
+				}else{
+					$('#custCount li[data-rel=' + clientID + '] .alertIcon:hidden').show();	
+				}
+			}else{
+				$('.alert-message').first().fadeIn('slow', function(){timeThis('#' + $('.alert-message').first().attr('id'), 1);});
+			}
+			
+			msgCount++;
+			
+		});
+		
+		
+		socket.on('customerLogoff', function(custName, clientID){
+			$('#messages h2').after('<div data-rel="' + clientID + '" id="msg-' + msgCount.toString() + '" class="alert-message info"><a href="#" class="close">x</a><p>' + custName + ' logged out</p></div>')
+			$('#noMessagesAlert').fadeOut('normal', function(){$(this).remove()});
+			if(highlighted){
+				var currentShown = $('#custCount li.highlighted').attr('data-rel');
+				if(clientID == currentShown){
+					$('.alert-message').first().fadeIn('slow');
+				}else{
+					$('#custCount li[data-rel=' + clientID + '] .alertIcon:hidden').show();		
+				}
+			}else{
+				$('.alert-message').first().fadeIn('slow');
+			}
+			msgCount++;
+		});
+		
+		socket.on('updateCustList', function(customers, clientIDs, customerCount){
+			var len=customers.length;
+			var content = '<h3>' + len + ' users are connected</h3>';
+			if (len > 0 ){
+				var content = content + '<ul>'
+				for(var i=0; i<len; i++) {
+					var content = content + '<li data-rel="' + clientIDs[i] + '">' + customers[i] + '<div class="alertIcon"><div></li>';
+				}
+				var content = content + '</ul>'
+			}
+			$('#custCount').html(content);
+		});
+		
+		var screenHeight = $(window).height();
+		$('.sidebar, #messages').css('min-height', screenHeight - 42 + 'px');
+		$('#messages div').fadeIn('slow');
+		
+		$('a.close').live('click', function(){
+			$(this).parent().clearQueue().text('ITEM CLEARED!').attr('class',' alert-message success').delay(1000).fadeOut('normal', function(){$(this).remove()});
+			return false;
+		});
+		
+		$('#custCount li').live('click', function(){
+			var dataID = $(this).attr('data-rel');
+			var userName = $(this).text();
+			$(this).addClass('highlighted').children('.alertIcon').hide();
+			highlighted = true
+			showRelatedMessages(dataID, userName);
+		});
+		
+		$('.crumb').live('click', function(){
+			$('#messages div').css('display','block');
+			$('#messages h2').html('Overview<a href="#" class="clearMsgs light">Clear All</a></span>');
+			$('#custCount li').removeClass('highlighted').children('.alertIcon').hide();
+			highlighted = false;
+		});
+		
+		$('.clearMsgs').live('click', function(){
+			$('#messages div').clearQueue().fadeOut('normal', function(){$('#messages div').remove()});
+		});
+		
+		function showRelatedMessages(dataID, userName){
+			$('#messages div').not('div[data-rel='+ dataID +']').css('display','none');
+			$('#messages div[data-rel='+ dataID +']').css('display','block');
+			$('#messages h2').html('Viewing user: ' + userName + '<a href="#" class="crumb light">Back to Overview</span><a href="#" class="clearMsgs light">Clear All</a></span>');
+		}
+		
+		$('.alert-mesage').bind(
+			'age',
+			function(event, ageCount, msgID){
+				logAge(ageCount, msgID);
+			}
+		);
+		
+		function logAge(ageCount, msgID){
+			console.log('At this point we can fire an event that logs that this is time ' + ageCount + ' that this has aged');	
+			timeThis(msgID, ageCount +1);
+		}
+		
+		function timeThis(msgID, counter){
+			
+			var iCount = parseInt(counter);
+			var el = $(msgID)
+			if ( iCount == 1){
+				console.log('called timeThis() on element ' + msgID + ' time number ' + counter);
+				el
+				.delay(2000)
+				.queue(function(){
+					$(this).attr('class', 'alert-message warning').trigger('age', [iCount, msgID]);
+				});
+			} 
+			if (iCount == 2){
+				console.log('called timeThis() on element ' + msgID + ' time number ' + counter);
+				el
+				.clearQueue()
+				.delay(2000)
+				.queue(function(){
+					$(this).attr('class', 'alert-message error').trigger('age', [iCount]);
+				});	
+			} 
+			if (iCount != 1 && iCount != 2 ){
+					//
+					console.log('called timeThis() on element ' + msgID + ' time number ' + counter);
+			}
+		}
+		
+	});
+</script>
+</head>
+
+<body>
+<div class="container-fluid">
+	<div class="sidebar white">
+		<div id="custCount">
+			<h3>Waiting for connections</h3>
+			<ul>
+				<li>No users currently</li>
+			</ul>
+		</div>
+	</div>
+	<div class="content">
+		<div id="messages" class="white">
+			<h2>Overview<a href="#" class="clearMsgs light">Clear All</a></span></h2>
+			<div class="alert-message info" id="noMessagesAlert">
+				No Current Events
+			</div>
+		</div>
+	</div>
+</div>
+
+</body>
+</html>
